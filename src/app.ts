@@ -1,13 +1,39 @@
 'use strict';
 const Koa = require('koa')
+const koaBody = require('koa-body')
+import typeKoaBody from 'koa-body/index'
 const indexRoute = require('./routes/index')
 const userRoute = require('./routes/user')
+const views = require('koa-views')
+const path = require('path')
+const getRawBody = require('raw-body')
 
 const app = new Koa();
 const PORT = 3000
 
+
+app.use(views(path.resolve(__dirname,'views'),{
+    extension: "pug",
+    map: {
+        pug: 'pug',                     // 映射.pug檔到pug模板引擎
+    }
+}))
+// app.use(koaBody())
+app.use(
+    async (ctx, next) => {
+        if (!ctx.request.body && ctx.request.headers['content-type'] === "application/octet-stream"){
+            ctx.request.body = await getRawBody(ctx.req,{
+                encoding: true
+            })
+        }else{
+            app.use(koaBody())
+        }
+        await next()
+    })
+
 app.use(indexRoute.routes(), indexRoute.allowedMethods())
 app.use(userRoute.routes(), userRoute.allowedMethods())
+
 
 // app.listen(PORT)
 

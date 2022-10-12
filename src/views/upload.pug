@@ -1,0 +1,76 @@
+doctype 
+html 
+    head 
+        meta(charset="UTF-8")
+        title 上傳頁面
+    body 
+        div 
+            form(method="POST" action="/upload" enctype="multipart/form-data") 
+                input(type="file" name="avatar" id="avatar" onchange="onChangeUpload()")
+                input(type="button", value="提交" onclick="createAndUploadChunk()")
+
+        img(src="", alt="" id="avatar" style="width:300px")
+
+    script.
+        let currentChunkIndex = 0
+        const chunkSize = 10 * 1024 // 10kb
+        
+
+        //預覽選取上傳的圖片
+        function onChangeUpload(){
+            const reader = new FileReader()
+            const file = document.querySelector('#avatar').files[0]
+            let img = document.querySelector('img')
+            reader.onload = function(){
+                img.src = reader.result
+            }
+            if(file){
+                reader.readAsDataURL(file)
+            }            
+        }
+
+        function createAndUploadChunk(){
+            //- const file = document.querySelector('#avatar')
+            //- console.log(file)
+            
+            const reader = new FileReader()
+            const file = document.querySelector('#avatar').files[0]
+            if(!file){
+                return
+            }
+            
+            const from = currentChunkIndex * chunkSize
+            const to = from + chunkSize
+            const blob = file.slice(from,to)
+            reader.onload = (e) => sendChunkToBackend(e.target.result, file.name, file.size)
+            reader.readAsDataURL(blob)
+        }
+
+        function sendChunkToBackend(chunk,name,fileSize){
+            const params = new URLSearchParams()
+            params.set('name',name)
+            params.set('size',fileSize)
+            params.set('currentChunkIndex', currentChunkIndex)
+            params.set('totalChunks', Math.ceil(fileSize / chunkSize))
+            
+            fetch("/upload?"+params,{
+                method: "POST",
+                headers: new Headers({
+                    'Content-Type': 'application/octet-stream'
+                }),
+                body: chunk 
+            })
+            .then(response => response.json())
+            .then(res=>{
+                const isLastChunk = currentChunkIndex === Math.ceil(fileSize / chunkSize)-1
+                if(!isLastChunk){
+                    console.log(res.msg)
+                    currentChunkIndex += 1
+                    createAndUploadChunk()
+                }else{
+                    //全部傳完
+                    console.log(res.msg)
+                    alert("傳完了!")
+                }
+            })
+        }
